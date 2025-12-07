@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>NFC-SOS — Админ</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<style>
+  body{font-family:Arial;margin:0;background:#f7fafc;color:#071226}
+  header{padding:12px;background:#0b1220;color:#e7f3f7}
+  .wrap{display:flex;gap:12px;padding:12px}
+  .left{flex:1}
+  .right{width:360px}
+  #map{height:72vh;border-radius:10px}
+  .card{background:white;padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(2,6,23,0.06)}
+  .entry{padding:8px;border-bottom:1px solid #eef2f7}
+  .anon{font-weight:700;color:#ff6b6b}
+</style>
+</head>
+<body>
+<header><h2>NFC-SOS — Панель мониторинга</h2></header>
+<div class="wrap">
+  <div class="left card">
+    <div id="map"></div>
+  </div>
+  <div class="right card">
+    <div style="margin-bottom:8px"><strong>Последние тревоги</strong></div>
+    <div id="log" style="max-height:64vh;overflow:auto"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+/* ========== ВСТАВЬ СВОЙ Apps Script URL ========== */
+const WEB_APP_URL = "YOUR_WEB_APP_URL";
+/* =============================================== */
+
+let map = L.map('map').setView([54.87,69.17], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+async function fetchData(){
+  try{
+    const res = await fetch(WEB_APP_URL + '?mode=json&limit=500');
+    if(!res.ok) throw new Error('Network ' + res.status);
+    const arr = await res.json();
+    render(arr);
+  }catch(err){
+    console.error(err);
+    document.getElementById('log').innerHTML = '<div class="entry">Ошибка загрузки: '+err.message+'</div>';
+  }
+}
+
+function render(arr){
+  const log = document.getElementById('log');
+  log.innerHTML = '';
+  // очищаем маркеры (простая реализация: создаём новый слой)
+  if(window._markerLayer) map.removeLayer(window._markerLayer);
+  window._markerLayer = L.layerGroup().addTo(map);
+  if(arr.length === 0) {
+    log.innerHTML = '<div class="entry">Нет записей</div>';
+    return;
+  }
+  arr.forEach(item => {
+    // item: {timestamp, lat, lng, ua, url, tagId, message, isAnonymous}
+    if(!item.lat || !item.lng) return;
+    const t = new Date(item.timestamp).toLocaleString();
+    const entry = document.createElement('div');
+    entry.className = 'entry';
+    let authorText = item.isAnonymous ? '<span class="anon">Аноним</span>' : (item.ua ? item.ua.substr(0,40) : 'Неизвестно');
+    entry.innerHTML = `<div><b>${t}</b></div>
+                       <div style="font-size:14px;margin-top:6px">${escapeHtml(item.message || '')}</div>
+                       <div style="margin-top:6px;font-size:12px;color:#64748b">${item.lat.toFixed(6)}, ${item.lng.toFixed(6)} — ${authorText} — tag:${item.tagId||'-'}</div>`;
+    log.prepend(entry);
+
+    const m = L.marker([item.lat,item.lng]).addTo(window._markerLayer);
+    m.bindPopup(`<b>${t}</b><br>${escapeHtml(item.message||'')}<br>tag:${item.tagId||'-'}<br>${item.isAnonymous? 'Аноним':'Не аноним'}`);
+  });
+  // центрируем на последней
+  const last = arr[0];
+  map.setView([last.lat,last.lng], 15);
+}
+
+// простая эвакуация html
+function escapeHtml(s){ if(!s) return ''; return s.replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]); }
+
+fetchData();
+setInterval(fetchData, 8000);
+
+// предупредить если не настроен URL
+if(WEB_APP_URL.includes('YOUR_WEB_APP_URL')){
+  document.getElementById('log').innerHTML = '<div class="entry">Настройте WEB_APP_URL в исходнике (Apps Script URL)</div>';
+}
+</script>
+</body>
+</html>
