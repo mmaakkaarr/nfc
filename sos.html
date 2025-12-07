@@ -3,201 +3,150 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>NFC-SOS — Отправка координат</title>
+<title>NFC-SOS — отправка сообщения</title>
 
-<!-- Стиль: аккуратно, современно -->
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --bg:#0f1724;
-    --card:#0b1220;
-    --accent:#06b6d4;
-    --muted:#9aa6b2;
-    --success:#22c55e;
-    --danger:#ff6b6b;
-  }
-  html,body{height:100%;margin:0;font-family:'Inter',system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;}
-  body{background:linear-gradient(180deg,#071025 0%, #071d2b 100%);color:#e6eef3;display:flex;align-items:center;justify-content:center;padding:20px;}
-  .container{width:100%;max-width:760px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:12px;padding:18px;box-shadow:0 10px 30px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.03);}
-  header{display:flex;gap:12px;align-items:center;}
-  .logo{width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;color:#021018;}
-  h1{margin:0;font-size:20px;}
-  p.lead{margin:6px 0 18px;color:var(--muted);font-size:14px;}
-  .card{background:rgba(255,255,255,0.02);padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,0.02);margin-bottom:12px;}
-  .status-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-  .btn{background:var(--accent);color:#021018;padding:10px 14px;border-radius:8px;border:none;font-weight:600;cursor:pointer;display:inline-flex;gap:8px;align-items:center;}
-  .btn.alt{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);}
-  .muted{color:var(--muted);font-size:13px;}
-  #map{height:360px;border-radius:8px;overflow:hidden;margin-top:12px;border:1px solid rgba(255,255,255,0.03);}
-  .row{display:flex;gap:8px;align-items:center;}
-  .actions{display:flex;gap:8px;margin-top:10px;}
-  .toast{position:fixed;right:20px;bottom:20px;background:#08121a;color:#cdeceff0;padding:12px 16px;border-radius:8px;box-shadow:0 6px 20px rgba(2,6,23,0.6);display:none;}
-  .spinner{width:18px;height:18px;border-radius:50%;border:3px solid rgba(255,255,255,0.12);border-top-color:var(--accent);animation:spin 1s linear infinite;display:inline-block;}
-  @keyframes spin{to{transform:rotate(360deg)}}
-  .small{font-size:13px;color:var(--muted);}
-  .footer{margin-top:14px;font-size:13px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;}
-  .danger{color:var(--danger);font-weight:600;}
-  a.link{color:var(--accent);text-decoration:none;}
-</style>
-
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<style>
+  :root{--bg:#071026;--card:#0b1622;--accent:#06b6d4;--muted:#98a9b3;--danger:#ff6b6b}
+  html,body{height:100%;margin:0;font-family:Inter,Arial;color:#e7f3f7;background:linear-gradient(180deg,#042231,#071026)}
+  .wrap{max-width:720px;margin:28px auto;padding:18px}
+  .card{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:18px;border-radius:12px;border:1px solid rgba(255,255,255,0.03);box-shadow:0 10px 30px rgba(2,6,23,0.6)}
+  h1{margin:0 0 6px;font-size:20px}
+  .lead{color:var(--muted);margin-bottom:12px}
+  textarea{width:100%;min-height:100px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+  .row{display:flex;gap:8px;align-items:center}
+  .btn{background:var(--accent);color:#012; padding:10px 14px;border-radius:10px;border:none;font-weight:700;cursor:pointer}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.03);color:var(--muted)}
+  label.switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+  .small{color:var(--muted);font-size:13px}
+  #map{height:320px;border-radius:10px;margin-top:14px;display:none}
+  .footer{display:flex;justify-content:space-between;align-items:center;margin-top:12px;color:var(--muted);font-size:13px}
+  .toast{position:fixed;right:18px;bottom:18px;background:#07202a;color:#bff7ff;padding:12px 14px;border-radius:10px;display:none}
+</style>
 </head>
 <body>
-
-<div class="container">
-  <header>
-    <div class="logo">SOS</div>
-    <div>
-      <h1>NFC-SOS — мгновенная отправка координат</h1>
-      <p class="lead">Сканируйте NFC-метку, и ваш телефон автоматически отправит координаты в центральную таблицу. Это занимает секунды и не требует приложения.</p>
-    </div>
-  </header>
-
+<div class="wrap">
   <div class="card">
-    <div class="status-row">
-      <div class="row">
-        <div id="indicator" class="spinner" style="display:none"></div>
-      </div>
-      <div style="flex:1">
-        <div id="message" class="muted">Ожидание действий… приложение попытается получить геолокацию и отправить её в базу.</div>
-      </div>
-      <div>
-        <button id="retryBtn" class="btn alt" style="display:none">Повторить</button>
-      </div>
+    <h1>🚨 NFC-SOS</h1>
+    <div class="lead">Поднесите телефон к метке и отправьте сообщение — координаты будут переданы ответственным. Можно отправить анонимно.</div>
+
+    <div style="margin-bottom:10px">
+      <textarea id="msg" placeholder="Опишите ситуацию (кратко) — обязательно, если нужна помощь"></textarea>
     </div>
 
-    <div id="controls" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-      <button id="sendBtn" class="btn"><span id="sendText">Отправить мою позицию</span></button>
-      <button id="shareBtn" class="btn alt">Скопировать ссылку</button>
-      <div style="margin-left:auto" class="small muted">Нажмите, если метка активирована</div>
+    <div class="row" style="margin-bottom:10px">
+      <label class="switch">
+        <input id="anon" type="checkbox" />
+        <span class="small">Отправить анонимно</span>
+      </label>
+      <div style="flex:1"></div>
+      <button id="send" class="btn">Отправить</button>
     </div>
 
-    <div id="map" style="display:none"></div>
+    <div id="status" class="small">Статус: Ожидание отправки</div>
+
+    <div id="map"></div>
 
     <div class="footer">
-      <div class="small">Если геолокация недоступна — откройте GPS/разрешите доступ и нажмите «Повторить».</div>
-      <div><a class="link" href="#" id="openSheet">Просмотреть базу</a></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div style="font-weight:600">Инструкция для показателей:</div>
-    <div class="small muted" style="margin-top:6px">
-      1) Поднесите телефон к метке → откроется эта страница.<br>
-      2) Нажмите «Отправить мою позицию» → координаты будут записаны в таблицу.<br>
-      3) На админ-странице координаты появятся на карте автоматически.
+      <div class="small">Если геолокация не определяется — включите GPS и разрешите доступ в браузере.</div>
+      <div><a id="sheetLink" class="small" href="#" target="_blank">Открыть базу</a></div>
     </div>
   </div>
 </div>
 
 <div id="toast" class="toast"></div>
 
-<!-- Leaflet + скрипты -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
-/* ========== НАСТРОЙКИ ========== */
-/* Вставь сюда URL своего Apps Script web app (Deploy -> web app -> Anyone, even anonymous) */
-const WEB_APP_URL = "YOUR_WEB_APP_URL"; // <-- Заменить
-/* Ссылка на админ-страницу */
-const ADMIN_PAGE_URL = "https://yourdomain.com/admin.html"; // <-- опционально заменить или оставить пустой
-/* ================================= */
+/* ========== НАСТРОЙКИ — ВСТАВЬ СЮДА СВОЙ Apps Script URL ========== */
+const WEB_APP_URL = "YOUR_WEB_APP_URL"; // <-- Заменить на URL из Google Apps Script (deploy web app)
+/* ================================================================= */
 
-const sendBtn = document.getElementById('sendBtn');
-const sendText = document.getElementById('sendText');
-const message = document.getElementById('message');
-const indicator = document.getElementById('indicator');
-const retryBtn = document.getElementById('retryBtn');
-const shareBtn = document.getElementById('shareBtn');
+const sendBtn = document.getElementById('send');
+const statusEl = document.getElementById('status');
+const msgEl = document.getElementById('msg');
+const anonEl = document.getElementById('anon');
 const toast = document.getElementById('toast');
-const mapWrap = document.getElementById('map');
-const openSheet = document.getElementById('openSheet');
+const mapDiv = document.getElementById('map');
+const sheetLink = document.getElementById('sheetLink');
 
-openSheet.href = WEB_APP_URL + "?mode=view"; // optional
+sheetLink.href = WEB_APP_URL + "?mode=view";
 
-let map, marker;
-
-function showToast(text, color){
-  toast.style.display='block';
-  toast.style.background = color || 'rgba(8,18,26,0.9)';
-  toast.textContent = text;
+function showToast(t){
+  toast.textContent = t;
+  toast.style.display = 'block';
   setTimeout(()=> toast.style.display='none', 3500);
 }
 
-async function getLocationOnce(){
-  return new Promise((resolve, reject) => {
-    if(!navigator.geolocation) return reject(new Error('Геолокация не поддерживается'));
-    navigator.geolocation.getCurrentPosition(pos => {
-      resolve(pos.coords);
-    }, err => {
-      reject(err);
-    }, {enableHighAccuracy:true, timeout:10000, maximumAge:0});
+async function getCoords(){
+  return new Promise((res, rej) => {
+    if(!navigator.geolocation) return rej(new Error("Геолокация не поддерживается"));
+    navigator.geolocation.getCurrentPosition(p => res(p.coords), e => rej(e), {enableHighAccuracy:true, timeout:15000});
   });
 }
 
-async function sendPositionAndShow(){
-  indicator.style.display='inline-block';
-  message.textContent = "Определяем местоположение…";
-  retryBtn.style.display='none';
+async function sendPayload(payload){
+  const res = await fetch(WEB_APP_URL, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    headers: {'Content-Type':'application/json'}
+  });
+  if(!res.ok) throw new Error('Ошибка сервера: ' + res.status);
+  return await res.json();
+}
+
+function showMap(lat,lng){
+  mapDiv.style.display = 'block';
+  if(!window._sos_map){
+    window._sos_map = L.map('map', {zoomControl:true}).setView([lat,lng], 16);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OSM'}).addTo(window._sos_map);
+    window._sos_marker = L.marker([lat,lng]).addTo(window._sos_map).bindPopup('Ваша позиция').openPopup();
+  } else {
+    window._sos_map.setView([lat,lng], 16);
+    window._sos_marker.setLatLng([lat,lng]).openPopup();
+  }
+}
+
+sendBtn.addEventListener('click', async () => {
+  const text = msgEl.value.trim();
+  if(text.length < 3){
+    showToast('Пожалуйста, опиши проблему кратко (3+ символа).');
+    return;
+  }
+  statusEl.textContent = 'Статус: Получение координат…';
+  sendBtn.disabled = true;
   try {
-    const coords = await getLocationOnce();
-    message.textContent = `Координаты: ${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)} — отправляем в базу…`;
-    // POST в Apps Script
+    const coords = await getCoords();
+    statusEl.textContent = `Статус: Отправка (lat ${coords.latitude.toFixed(6)} lng ${coords.longitude.toFixed(6)})`;
+    const tagId = new URLSearchParams(window.location.search).get('id') || '';
     const payload = {
       lat: coords.latitude,
       lng: coords.longitude,
-      // дополнительная информация: userAgent и URL, полезно для админов
+      message: text,
+      isAnonymous: !!anonEl.checked,
+      tagId: tagId,
       ua: navigator.userAgent,
-      url: location.href
+      url: window.location.href
     };
-    const res = await fetch(WEB_APP_URL, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(payload)
-    });
-    if(!res.ok) throw new Error('Ошибка отправки: ' + res.status);
-    // показать карту
+    await sendPayload(payload);
+    statusEl.textContent = 'Статус: Отправлено ✅';
+    showToast('Координаты и сообщение отправлены.');
     showMap(coords.latitude, coords.longitude);
-    showToast('Координаты отправлены. Помощь уведомлена (запись в базе).', null);
-    message.textContent = 'Координаты успешно отправлены. Подождите, пока админы увидят сообщение.';
-    sendText.textContent = 'Отправлено';
     sendBtn.disabled = true;
-  } catch (e) {
-    console.error(e);
-    message.textContent = 'Не удалось получить/отправить координаты: ' + (e.message || e);
-    retryBtn.style.display='inline-block';
-    showToast('Ошибка: ' + (e.message || e), 'linear-gradient(90deg,var(--danger),#b91c1c)');
-  } finally {
-    indicator.style.display='none';
+  } catch(err) {
+    console.error(err);
+    statusEl.textContent = 'Статус: Ошибка — см. консоль';
+    showToast('Ошибка: ' + (err.message || err));
+    sendBtn.disabled = false;
   }
-}
-
-function showMap(lat, lng){
-  mapWrap.style.display = 'block';
-  if(!map){
-    map = L.map('map', {zoomControl:false}).setView([lat, lng], 16);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
-    marker = L.marker([lat,lng]).addTo(map);
-    marker.bindPopup("Ваша позиция").openPopup();
-  } else {
-    marker.setLatLng([lat,lng]);
-    map.setView([lat,lng], 16);
-    marker.openPopup();
-  }
-}
-
-// Кнопки
-sendBtn.addEventListener('click', sendPositionAndShow);
-retryBtn.addEventListener('click', sendPositionAndShow);
-shareBtn.addEventListener('click', () => {
-  const text = window.location.href;
-  navigator.clipboard?.writeText(text).then(()=> showToast('Ссылка скопирована в буфер обмена'), ()=> showToast('Скопируй ссылку вручную: '+text));
 });
 
-// если WEB_APP_URL не задан — показываем подсказку
-if(WEB_APP_URL.includes("YOUR_WEB_APP_URL")){
-  message.textContent = "Внимание: WEB_APP_URL не задан. Откройте исходник и вставьте URL Apps Script web app.";
+// предупреждение если WEB_APP_URL не заменён
+if(WEB_APP_URL.includes('YOUR_WEB_APP_URL')){
+  statusEl.textContent = 'Статус: Установите WEB_APP_URL в исходнике (Apps Script URL).';
   sendBtn.disabled = true;
-  shareBtn.disabled = true;
+  sheetLink.style.display = 'none';
 }
 </script>
 </body>
