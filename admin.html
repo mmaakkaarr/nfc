@@ -36,12 +36,13 @@ let markerLayer;
 async function fetchData(){
   try{
     const r = await fetch(SHEETDB_URL);
+    if(!r.ok) throw new Error("Ошибка сети: "+r.status);
     const data = await r.json();
-    const arr = data.reverse(); // последние сверху
-    render(arr);
+    if(!Array.isArray(data)) throw new Error("Неверный формат данных");
+    render(data.reverse());
   }catch(err){
     console.error(err);
-    document.getElementById('log').innerHTML='<div class="entry">Ошибка загрузки</div>';
+    document.getElementById('log').innerHTML='<div class="entry">Ошибка загрузки: '+err.message+'</div>';
   }
 }
 
@@ -56,23 +57,29 @@ function render(arr){
   arr.forEach(item=>{
     const lat=parseFloat(item.lat);
     const lng=parseFloat(item.lng);
-    if(isNaN(lat) || isNaN(lng)) return;
-    const t = new Date(item.timestamp).toLocaleString();
+    if(isNaN(lat)||isNaN(lng)) return;
+
+    const isAnon = item.isAnonymous==='true';
+    const msg = item.message || "-";
+    const ua = item.ua || "Неизвестно";
+
     const entry = document.createElement('div');
     entry.className='entry';
-    let isAnon = item.isAnonymous==='true';
-    let author = isAnon ? '<span class="anon">Аноним</span>' : (item.ua||'Неизвестно').substr(0,40);
-    entry.innerHTML=`<div><b>${t}</b></div>
-                     <div style="font-size:14px;margin-top:4px">${escapeHtml(item.message||'')}</div>
-                     <div style="font-size:12px;color:#64748b;margin-top:4px">${lat.toFixed(6)}, ${lng.toFixed(6)} — ${author}</div>`;
+    entry.innerHTML = `<div><b>${new Date(item.timestamp).toLocaleString()}</b></div>
+                       <div>${escapeHtml(msg)}</div>
+                       <div style="font-size:12px;color:#64748b">${lat.toFixed(6)}, ${lng.toFixed(6)} — ${isAnon?'Аноним':ua}</div>`;
     log.appendChild(entry);
 
-    const markerColor = isAnon ? 'red' : 'blue';
-    const icon = L.icon({iconUrl:`https://chart.googleapis.com/chart?chst=d_map_pin_letter&chld=%E2%80%A2|${markerColor}`, iconSize:[21,34], iconAnchor:[10,34]});
-    L.marker([lat,lng],{icon}).addTo(markerLayer).bindPopup(`<b>${t}</b><br>${escapeHtml(item.message||'')}<br>${author}`);
+    const color = isAnon?'red':'blue';
+    const icon = L.icon({
+      iconUrl:`https://chart.googleapis.com/chart?chst=d_map_pin_letter&chld=%E2%80%A2|${color}`,
+      iconSize:[21,34],
+      iconAnchor:[10,34]
+    });
+    L.marker([lat,lng],{icon}).addTo(markerLayer)
+     .bindPopup(`<b>${new Date(item.timestamp).toLocaleString()}</b><br>${escapeHtml(msg)}<br>${isAnon?'Аноним':ua}`);
   });
 
-  // центрируем на последнем сообщении
   const last = arr[0];
   if(last) map.setView([parseFloat(last.lat),parseFloat(last.lng)],15);
 }
