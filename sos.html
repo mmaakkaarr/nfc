@@ -75,13 +75,13 @@ sendBtn.addEventListener('click', async ()=>{
     statusEl.textContent='Отправка…';
     const payload = {
       timestamp: new Date().toISOString(),
-      lat: coords.latitude,
-      lng: coords.longitude,
+      lat: coords.latitude.toString(),
+      lng: coords.longitude.toString(),
       message: text,
-      isAnonymous: !!anonEl.checked,
+      isAnonymous: anonEl.checked.toString(),
       tagId:'',
-      ua:navigator.userAgent,
-      url:window.location.href
+      ua: navigator.userAgent,
+      url: window.location.href
     };
     await sendData(payload);
     statusEl.textContent='Отправлено ✅';
