@@ -1,60 +1,79 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>NFC‑SOS — Админ</title>
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NFC-SOS Admin</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 <style>
-  body{margin:0;font-family:Arial;background:#f0f4f8;color:#021018}
-  header{padding:12px;background:#0b1220;color:white;text-align:center}
-  #map{height:85vh}
-  .popup-message{white-space: pre-wrap;}
+body{font-family:Arial;background:#f7fafc;color:#071226;margin:0;padding:12px}
+.wrap{display:flex;gap:12px}
+.left{flex:1}
+.right{width:360px}
+#map{height:72vh;border-radius:10px}
+.card{background:white;padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(2,6,23,0.06)}
+.entry{padding:8px;border-bottom:1px solid #eef2f7}
+.anon{font-weight:700;color:#ff6b6b}
 </style>
 </head>
 <body>
-<header><h2>📍 NFC‑SOS — Панель мониторинга</h2></header>
-<div id="map"></div>
+<div class="wrap">
+<div class="left card"><div id="map"></div></div>
+<div class="right card">
+<h3>Последние тревоги</h3>
+<div id="log" style="max-height:64vh;overflow:auto"></div>
+</div>
+</div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
-/* ======= ВАЖНО: вставьте URL Apps Script ======= */
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyOeUni8fKkWARp0iFBHpapU55b_2OnkHfuPdPmmdvp3-3g3i_b_JbsKosHjkA-AKrMjQ/exec";
-/* =============================================== */
+const SHEETDB_URL = "https://sheetdb.io/api/v1/loeua7zl5xak6";
 
-const map = L.map('map').setView([54.87,69.17], 12);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap contributors' }).addTo(map);
+let map = L.map('map').setView([54.87,69.17],12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+let markerLayer;
 
-async function loadAlerts(){
-  try {
-    const res = await fetch(WEB_APP_URL + '?mode=json&limit=500');
-    if(!res.ok) throw new Error('Network ' + res.status);
-    const arr = await res.json();
+async function fetchData(){
+  try{
+    const r = await fetch(SHEETDB_URL);
+    const data = await r.json();
+    const arr = data.reverse(); // последние сверху
     render(arr);
-  } catch(err) {
-    alert('Ошибка загрузки данных: ' + err);
+  }catch(err){
+    console.error(err);
+    document.getElementById('log').innerHTML='<div class="entry">Ошибка загрузки</div>';
   }
 }
 
 function render(arr){
-  arr.forEach(item => {
-    if (!item.lat || !item.lng) return;
-    const date = new Date(item.timestamp).toLocaleString();
-    const message = item.message || "(без описания)";
-    const anon = item.isAnonymous ? 'Аноним' : 'Не аноним';
-    const popup = `<b>${date}</b><br><i>${anon}</i><br><div class="popup-message">${escapeHtml(message)}</div>`;
-    L.marker([item.lat, item.lng]).addTo(map).bindPopup(popup);
+  const log = document.getElementById('log');
+  log.innerHTML='';
+  if(markerLayer) map.removeLayer(markerLayer);
+  markerLayer=L.layerGroup().addTo(map);
+
+  if(arr.length===0){ log.innerHTML='<div class="entry">Нет записей</div>'; return; }
+
+  arr.forEach(item=>{
+    if(!item.lat || !item.lng) return;
+    const t = new Date(item.timestamp).toLocaleString();
+    const entry = document.createElement('div');
+    entry.className='entry';
+    let author = item.isAnonymous=='true' ? '<span class="anon">Аноним</span>' : (item.ua||'Неизвестно').substr(0,40);
+    entry.innerHTML=`<div><b>${t}</b></div>
+                     <div style="font-size:14px;margin-top:4px">${escapeHtml(item.message||'')}</div>
+                     <div style="font-size:12px;color:#64748b;margin-top:4px">${item.lat}, ${item.lng} — ${author}</div>`;
+    log.appendChild(entry);
+
+    const m = L.marker([item.lat,item.lng]).addTo(markerLayer);
+    m.bindPopup(`<b>${t}</b><br>${escapeHtml(item.message||'')}<br>${author}`);
   });
+  map.setView([arr[0].lat,arr[0].lng],15);
 }
 
-function escapeHtml(s){
-  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-}
+function escapeHtml(s){ if(!s) return ''; return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
 
-loadAlerts();
-setInterval(loadAlerts, 10000);
+fetchData();
+setInterval(fetchData,8000);
 </script>
 </body>
 </html>
-
