@@ -117,10 +117,7 @@ sendBtn.addEventListener('click', async () => {
   statusEl.textContent = 'Статус: Получение координат…';
   sendBtn.disabled = true;
   try {
-    let coords;
-    try { coords = await getCoords(); } 
-    catch(e) { coords = {latitude: 54.87, longitude:69.17}; showToast('GPS не доступен, использованы тестовые координаты'); }
-
+    const coords = await getCoords();
     statusEl.textContent = `Статус: Отправка (lat ${coords.latitude.toFixed(6)} lng ${coords.longitude.toFixed(6)})`;
 
     const payload = {
