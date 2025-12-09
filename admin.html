@@ -17,6 +17,7 @@
   .entry{padding:8px;border-bottom:1px solid #eef2f7}
   .anon{font-weight:700;color:#ff0000}
   .normal{font-weight:700;color:#0077ff}
+  button {cursor:pointer}
 </style>
 </head>
 <body>
@@ -28,7 +29,10 @@
   <div class="right card">
     <div style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
       <strong>Последние тревоги</strong>
-      <button id="clearMarkers" style="padding:4px 8px;border-radius:5px;border:none;background:#ff6b6b;color:white;cursor:pointer;font-size:12px;">Очистить маркеры</button>
+      <div>
+        <button id="clearMarkers" style="padding:4px 8px;border-radius:5px;border:none;background:#ff6b6b;color:white;font-size:12px;">Очистить маркеры</button>
+        <button id="clearAll" style="padding:4px 8px;border-radius:5px;border:none;background:#ff0000;color:white;font-size:12px;">Очистить все тревоги</button>
+      </div>
     </div>
     <div id="log" style="max-height:64vh;overflow:auto"></div>
   </div>
@@ -42,7 +46,9 @@ let map = L.map('map').setView([54.87,69.17], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 let markerLayer = L.layerGroup().addTo(map);
+let existingMarkers = {}; // чтобы не дублировать
 
+// Загрузка данных
 async function fetchData(){
   try{
     const res = await fetch(SHEETDB_URL);
@@ -55,18 +61,14 @@ async function fetchData(){
   }
 }
 
+// Отрисовка маркеров и логов
 function render(arr){
   const log = document.getElementById('log');
-  log.innerHTML = '';
 
-  markerLayer.clearLayers();
+  arr.forEach(item => {
+    const timestamp = item.timestamp;
+    if(existingMarkers[timestamp]) return; // уже добавлен
 
-  if(arr.length === 0) {
-    log.innerHTML = '<div class="entry">Нет записей</div>';
-    return;
-  }
-
-  arr.reverse().forEach(item => {
     const lat = parseFloat(item.lat);
     const lng = parseFloat(item.lng);
     if(isNaN(lat) || isNaN(lng)) return;
@@ -74,6 +76,7 @@ function render(arr){
     const message = item.message || '-';
     const isAnon = item.isAnonymous === 'true';
 
+    // лог
     const entry = document.createElement('div');
     entry.className = 'entry';
     entry.innerHTML = `<div><b>${new Date(item.timestamp).toLocaleString()}</b></div>
@@ -84,14 +87,19 @@ function render(arr){
                        </div>`;
     log.prepend(entry);
 
-    const color = isAnon ? 'red' : '0077ff';
-    const icon = L.icon({
-      iconUrl:`https://chart.googleapis.com/chart?chst=d_map_pin_letter&chld=%E2%80%A2|${color}`,
-      iconSize:[21,34],
-      iconAnchor:[10,34]
-    });
-    L.marker([lat,lng], {icon}).addTo(markerLayer)
-      .bindPopup(`<b>${new Date(item.timestamp).toLocaleString()}</b><br>${escapeHtml(message)}<br>tag:${item.tagId||'-'}<br>${isAnon?'Аноним':'Не аноним'}`);
+    // маркер
+    const circle = L.circleMarker([lat,lng], {
+      radius: 8,
+      fillColor: isAnon ? '#ff0000' : '#0077ff',
+      color: '#000',
+      weight: 1,
+      opacity: 1,
+      fillOpacity: 0.8
+    }).addTo(markerLayer);
+
+    circle.bindPopup(`<b>${new Date(item.timestamp).toLocaleString()}</b><br>${escapeHtml(message)}<br>tag:${item.tagId||'-'}<br>${isAnon?'Аноним':'Не аноним'}`);
+
+    existingMarkers[timestamp] = circle;
   });
 
   const last = arr[arr.length-1];
@@ -105,10 +113,28 @@ function escapeHtml(s){
   return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); 
 }
 
-// Очистка маркеров по кнопке
+// Очистка маркеров с карты
 document.getElementById('clearMarkers').addEventListener('click', () => {
   markerLayer.clearLayers();
-  showToast('Все маркеры удалены с карты');
+  existingMarkers = {};
+  document.getElementById('log').innerHTML = '';
+  showToast('Все маркеры удалены с карты (данные остаются)');
+});
+
+// Полное удаление данных из SheetDB
+document.getElementById('clearAll').addEventListener('click', async () => {
+  if(!confirm("Вы точно хотите удалить все тревоги? Это действие нельзя отменить!")) return;
+  try {
+    const res = await fetch(SHEETDB_URL, { method: 'DELETE' });
+    if(!res.ok) throw new Error('Ошибка удаления: ' + res.status);
+    markerLayer.clearLayers();
+    existingMarkers = {};
+    document.getElementById('log').innerHTML = '';
+    showToast('Все тревоги полностью удалены!');
+  } catch(err) {
+    console.error(err);
+    showToast('Ошибка удаления: ' + (err.message||err));
+  }
 });
 
 // Простая функция toast
