@@ -26,7 +26,10 @@
     <div id="map"></div>
   </div>
   <div class="right card">
-    <div style="margin-bottom:8px"><strong>Последние тревоги</strong></div>
+    <div style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+      <strong>Последние тревоги</strong>
+      <button id="clearMarkers" style="padding:4px 8px;border-radius:5px;border:none;background:#ff6b6b;color:white;cursor:pointer;font-size:12px;">Очистить маркеры</button>
+    </div>
     <div id="log" style="max-height:64vh;overflow:auto"></div>
   </div>
 </div>
@@ -81,7 +84,7 @@ function render(arr){
                        </div>`;
     log.prepend(entry);
 
-    const color = isAnon ? 'red' : 'blue';
+    const color = isAnon ? 'red' : '0077ff';
     const icon = L.icon({
       iconUrl:`https://chart.googleapis.com/chart?chst=d_map_pin_letter&chld=%E2%80%A2|${color}`,
       iconSize:[21,34],
@@ -100,6 +103,28 @@ function render(arr){
 function escapeHtml(s){ 
   if(!s) return ''; 
   return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); 
+}
+
+// Очистка маркеров по кнопке
+document.getElementById('clearMarkers').addEventListener('click', () => {
+  markerLayer.clearLayers();
+  showToast('Все маркеры удалены с карты');
+});
+
+// Простая функция toast
+function showToast(msg){
+  let t = document.createElement('div');
+  t.style.position = 'fixed';
+  t.style.bottom = '18px';
+  t.style.right = '18px';
+  t.style.background = '#07202a';
+  t.style.color = '#bff7ff';
+  t.style.padding = '10px 14px';
+  t.style.borderRadius = '10px';
+  t.style.zIndex = '9999';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=> t.remove(), 3000);
 }
 
 fetchData();
