@@ -57,12 +57,17 @@ async function getCoords(){
 }
 
 async function sendData(payload){
-  const res = await fetch(SHEETDB_URL, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({data: payload})
-  });
-  return await res.json();
+  try{
+    const res = await fetch(SHEETDB_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({data: payload})
+    });
+    if(!res.ok) throw new Error('Ошибка сервера: '+res.status);
+    return await res.json();
+  } catch(err){
+    throw err;
+  }
 }
 
 sendBtn.addEventListener('click', async ()=>{
@@ -79,9 +84,9 @@ sendBtn.addEventListener('click', async ()=>{
       lng: coords.longitude.toString(),
       message: text,
       isAnonymous: anonEl.checked.toString(),
-      tagId:'',
-      ua: navigator.userAgent,
-      url: window.location.href
+      tagId: "-",
+      ua: navigator.userAgent || "-",
+      url: window.location.href || "-"
     };
     await sendData(payload);
     statusEl.textContent='Отправлено ✅';
