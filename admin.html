@@ -54,20 +54,27 @@ function render(arr){
   if(arr.length===0){ log.innerHTML='<div class="entry">Нет записей</div>'; return; }
 
   arr.forEach(item=>{
-    if(!item.lat || !item.lng) return;
+    const lat=parseFloat(item.lat);
+    const lng=parseFloat(item.lng);
+    if(isNaN(lat) || isNaN(lng)) return;
     const t = new Date(item.timestamp).toLocaleString();
     const entry = document.createElement('div');
     entry.className='entry';
-    let author = item.isAnonymous=='true' ? '<span class="anon">Аноним</span>' : (item.ua||'Неизвестно').substr(0,40);
+    let isAnon = item.isAnonymous==='true';
+    let author = isAnon ? '<span class="anon">Аноним</span>' : (item.ua||'Неизвестно').substr(0,40);
     entry.innerHTML=`<div><b>${t}</b></div>
                      <div style="font-size:14px;margin-top:4px">${escapeHtml(item.message||'')}</div>
-                     <div style="font-size:12px;color:#64748b;margin-top:4px">${item.lat}, ${item.lng} — ${author}</div>`;
+                     <div style="font-size:12px;color:#64748b;margin-top:4px">${lat.toFixed(6)}, ${lng.toFixed(6)} — ${author}</div>`;
     log.appendChild(entry);
 
-    const m = L.marker([item.lat,item.lng]).addTo(markerLayer);
-    m.bindPopup(`<b>${t}</b><br>${escapeHtml(item.message||'')}<br>${author}`);
+    const markerColor = isAnon ? 'red' : 'blue';
+    const icon = L.icon({iconUrl:`https://chart.googleapis.com/chart?chst=d_map_pin_letter&chld=%E2%80%A2|${markerColor}`, iconSize:[21,34], iconAnchor:[10,34]});
+    L.marker([lat,lng],{icon}).addTo(markerLayer).bindPopup(`<b>${t}</b><br>${escapeHtml(item.message||'')}<br>${author}`);
   });
-  map.setView([arr[0].lat,arr[0].lng],15);
+
+  // центрируем на последнем сообщении
+  const last = arr[0];
+  if(last) map.setView([parseFloat(last.lat),parseFloat(last.lng)],15);
 }
 
 function escapeHtml(s){ if(!s) return ''; return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
