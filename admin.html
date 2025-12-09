@@ -1,93 +1,115 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NFC-SOS Admin</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>NFC-SOS — Панель мониторинга</title>
+
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 <style>
-body{font-family:Arial;background:#f7fafc;color:#071226;margin:0;padding:12px}
-.wrap{display:flex;gap:12px}
-.left{flex:1}
-.right{width:360px}
-#map{height:72vh;border-radius:10px}
-.card{background:white;padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(2,6,23,0.06)}
-.entry{padding:8px;border-bottom:1px solid #eef2f7}
-.anon{font-weight:700;color:#ff6b6b}
+  body{font-family:Arial;margin:0;background:#f7fafc;color:#071226}
+  header{padding:12px;background:#0b1220;color:#e7f3f7}
+  .wrap{display:flex;gap:12px;padding:12px}
+  .left{flex:1}
+  .right{width:360px}
+  #map{height:72vh;border-radius:10px}
+  .card{background:white;padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(2,6,23,0.06)}
+  .entry{padding:8px;border-bottom:1px solid #eef2f7}
+  .anon{font-weight:700;color:#ff0000}
+  .normal{font-weight:700;color:#0077ff}
 </style>
 </head>
 <body>
+<header><h2>NFC-SOS — Панель мониторинга</h2></header>
 <div class="wrap">
-<div class="left card"><div id="map"></div></div>
-<div class="right card">
-<h3>Последние тревоги</h3>
-<div id="log" style="max-height:64vh;overflow:auto"></div>
-</div>
+  <div class="left card">
+    <div id="map"></div>
+  </div>
+  <div class="right card">
+    <div style="margin-bottom:8px"><strong>Последние тревоги</strong></div>
+    <div id="log" style="max-height:64vh;overflow:auto"></div>
+  </div>
 </div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
+/* ======== ВСТАВЬ СВОЙ SheetDB URL ======== */
 const SHEETDB_URL = "https://sheetdb.io/api/v1/loeua7zl5xak6";
+/* ========================================== */
 
-let map = L.map('map').setView([54.87,69.17],12);
+let map = L.map('map').setView([54.87,69.17], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-let markerLayer;
+
+let markerLayer = L.layerGroup().addTo(map);
 
 async function fetchData(){
   try{
-    const r = await fetch(SHEETDB_URL);
-    if(!r.ok) throw new Error("Ошибка сети: "+r.status);
-    const data = await r.json();
-    if(!Array.isArray(data)) throw new Error("Неверный формат данных");
-    render(data.reverse());
+    const res = await fetch(SHEETDB_URL);
+    if(!res.ok) throw new Error('Network ' + res.status);
+    const arr = await res.json();
+    render(arr);
   }catch(err){
     console.error(err);
-    document.getElementById('log').innerHTML='<div class="entry">Ошибка загрузки: '+err.message+'</div>';
+    document.getElementById('log').innerHTML = '<div class="entry">Ошибка загрузки: '+err.message+'</div>';
   }
 }
 
 function render(arr){
   const log = document.getElementById('log');
-  log.innerHTML='';
-  if(markerLayer) map.removeLayer(markerLayer);
-  markerLayer=L.layerGroup().addTo(map);
+  log.innerHTML = '';
 
-  if(arr.length===0){ log.innerHTML='<div class="entry">Нет записей</div>'; return; }
+  markerLayer.clearLayers(); // очищаем старые маркеры
 
-  arr.forEach(item=>{
-    const lat=parseFloat(item.lat);
-    const lng=parseFloat(item.lng);
-    if(isNaN(lat)||isNaN(lng)) return;
+  if(arr.length === 0) {
+    log.innerHTML = '<div class="entry">Нет записей</div>';
+    return;
+  }
 
-    const isAnon = item.isAnonymous==='true';
-    const msg = item.message || "-";
-    const ua = item.ua || "Неизвестно";
+  arr.reverse().forEach(item => {
+    // конвертируем координаты в числа, fallback если пустые
+    const lat = parseFloat(item.lat) || 54.87;
+    const lng = parseFloat(item.lng) || 69.17;
 
+    // проверка сообщений
+    const message = item.message || '-';
+    const isAnon = item.isAnonymous === 'true';
+
+    // добавляем запись в лог
     const entry = document.createElement('div');
-    entry.className='entry';
+    entry.className = 'entry';
     entry.innerHTML = `<div><b>${new Date(item.timestamp).toLocaleString()}</b></div>
-                       <div>${escapeHtml(msg)}</div>
-                       <div style="font-size:12px;color:#64748b">${lat.toFixed(6)}, ${lng.toFixed(6)} — ${isAnon?'Аноним':ua}</div>`;
-    log.appendChild(entry);
+                       <div style="font-size:14px;margin-top:6px">${escapeHtml(message)}</div>
+                       <div style="margin-top:6px;font-size:12px;color:#64748b">
+                         ${lat.toFixed(6)}, ${lng.toFixed(6)} — 
+                         <span class="${isAnon?'anon':'normal'}">${isAnon?'Аноним':'Не аноним'}</span> — tag:${item.tagId||'-'}
+                       </div>`;
+    log.prepend(entry);
 
-    const color = isAnon?'red':'blue';
+    // создаем маркер с цветом
+    const color = isAnon ? 'red' : 'blue';
     const icon = L.icon({
       iconUrl:`https://chart.googleapis.com/chart?chst=d_map_pin_letter&chld=%E2%80%A2|${color}`,
       iconSize:[21,34],
       iconAnchor:[10,34]
     });
-    L.marker([lat,lng],{icon}).addTo(markerLayer)
-     .bindPopup(`<b>${new Date(item.timestamp).toLocaleString()}</b><br>${escapeHtml(msg)}<br>${isAnon?'Аноним':ua}`);
+    L.marker([lat,lng], {icon}).addTo(markerLayer)
+      .bindPopup(`<b>${new Date(item.timestamp).toLocaleString()}</b><br>${escapeHtml(message)}<br>tag:${item.tagId||'-'}<br>${isAnon?'Аноним':'Не аноним'}`);
   });
 
-  const last = arr[0];
-  if(last) map.setView([parseFloat(last.lat),parseFloat(last.lng)],15);
+  // центрируем на последнем маркере
+  const last = arr[arr.length-1];
+  const lastLat = parseFloat(last.lat) || 54.87;
+  const lastLng = parseFloat(last.lng) || 69.17;
+  map.setView([lastLat,lastLng], 15);
 }
 
-function escapeHtml(s){ if(!s) return ''; return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
+function escapeHtml(s){ 
+  if(!s) return ''; 
+  return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); 
+}
 
 fetchData();
-setInterval(fetchData,8000);
+setInterval(fetchData, 8000);
 </script>
 </body>
 </html>
