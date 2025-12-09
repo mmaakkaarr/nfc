@@ -46,7 +46,7 @@ let map = L.map('map').setView([54.87,69.17], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 let markerLayer = L.layerGroup().addTo(map);
-let existingMarkers = {}; // чтобы не дублировать
+let existingMarkers = {};
 
 // Загрузка данных
 async function fetchData(){
@@ -67,14 +67,16 @@ function render(arr){
 
   arr.forEach(item => {
     const timestamp = item.timestamp;
-    if(existingMarkers[timestamp]) return; // уже добавлен
+    if(existingMarkers[timestamp]) return;
 
     const lat = parseFloat(item.lat);
     const lng = parseFloat(item.lng);
     if(isNaN(lat) || isNaN(lng)) return;
 
     const message = item.message || '-';
-    const isAnon = item.isAnonymous === 'true';
+
+    // исправленная проверка isAnonymous
+    const isAnon = item.isAnonymous && item.isAnonymous.toString().toLowerCase() === 'true';
 
     // лог
     const entry = document.createElement('div');
@@ -121,19 +123,26 @@ document.getElementById('clearMarkers').addEventListener('click', () => {
   showToast('Все маркеры удалены с карты (данные остаются)');
 });
 
-// Полное удаление данных из SheetDB
+// Полное удаление всех тревог
 document.getElementById('clearAll').addEventListener('click', async () => {
   if(!confirm("Вы точно хотите удалить все тревоги? Это действие нельзя отменить!")) return;
+
   try {
-    const res = await fetch(SHEETDB_URL, { method: 'DELETE' });
-    if(!res.ok) throw new Error('Ошибка удаления: ' + res.status);
+    const res = await fetch(SHEETDB_URL);
+    if(!res.ok) throw new Error('Ошибка при получении данных: ' + res.status);
+    const data = await res.json();
+
+    for(const item of data){
+      await fetch(`${SHEETDB_URL}/row/${item.id}`, { method: 'DELETE' });
+    }
+
     markerLayer.clearLayers();
     existingMarkers = {};
     document.getElementById('log').innerHTML = '';
     showToast('Все тревоги полностью удалены!');
-  } catch(err) {
+  } catch(err){
     console.error(err);
-    showToast('Ошибка удаления: ' + (err.message||err));
+    showToast('Ошибка удаления: ' + (err.message || err));
   }
 });
 
