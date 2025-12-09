@@ -1,114 +1,98 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>NFC SOS</title>
-
-<!-- Стиль -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NFC-SOS</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <style>
-body {
-    font-family: Arial, sans-serif;
-    background: linear-gradient(135deg,#ff4444,#ff6a00);
-    color: white;
-    text-align: center;
-    padding: 20px;
-}
-.card {
-    background: white;
-    color: black;
-    padding: 20px;
-    border-radius: 16px;
-    max-width: 420px;
-    margin: auto;
-    box-shadow: 0 0 20px rgba(0,0,0,0.4);
-}
-button {
-    background: #ff3b3b;
-    color: white;
-    border: none;
-    padding: 14px 20px;
-    border-radius: 12px;
-    font-size: 18px;
-    width: 100%;
-    cursor: pointer;
-    font-weight: bold;
-}
-button:hover {
-    opacity: 0.8;
-}
-#status {
-    margin: 10px 0;
-    font-weight: bold;
-}
-#map {
-    margin-top: 20px;
-    height: 350px;
-    border-radius: 12px;
-}
+body{font-family:Arial;background:#071026;color:#e7f3f7;margin:0;padding:0}
+.wrap{max-width:720px;margin:20px auto;padding:15px}
+textarea{width:100%;min-height:100px;padding:10px;border-radius:8px;border:none;background:#0b1622;color:#e7f3f7}
+button{padding:10px 14px;border:none;border-radius:8px;background:#06b6d4;color:#012;cursor:pointer;font-weight:600;margin-top:8px}
+#map{height:300px;margin-top:12px;display:none;border-radius:8px}
+#status{margin-top:8px;color:#98a9b3}
 </style>
 </head>
-
 <body>
-<h2>🚨 NFC SOS — Сигнал тревоги</h2>
-
-<div class="card">
-    <p>Нажмите кнопку ниже, чтобы отправить координаты.</p>
-
-    <button onclick="sendSOS()">Отправить SOS</button>
-    <p id="status"></p>
+<div class="wrap">
+<h2>🚨 NFC-SOS</h2>
+<p>Опишите ситуацию:</p>
+<textarea id="msg"></textarea>
+<label><input type="checkbox" id="anon"> Отправить анонимно</label>
+<br>
+<button id="send">Отправить</button>
+<div id="status">Статус: ожидание</div>
+<div id="map"></div>
 </div>
 
-<div id="map"></div>
-
-<!-- Leaflet -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
 <script>
-// ⬇⬇⬇ ВСТАВЬ СЮДА СВОЙ URL из Google Apps Script
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyOeUni8fKkWARp0iFBHpapU55b_2OnkHfuPdPmmdvp3-3g3i_b_JbsKosHjkA-AKrMjQ/exec";
-// ⬆⬆⬆
+const SHEETDB_URL = "https://sheetdb.io/api/v1/loeua7zl5xak6";
 
-function sendSOS() {
-    document.getElementById("status").textContent = "Получаю геолокацию...";
+const msgEl = document.getElementById('msg');
+const anonEl = document.getElementById('anon');
+const sendBtn = document.getElementById('send');
+const statusEl = document.getElementById('status');
+const mapDiv = document.getElementById('map');
+let map, marker;
 
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-        let lat = pos.coords.latitude;
-        let lng = pos.coords.longitude;
-
-        let userAgent = navigator.userAgent;
-        let fullUrl = window.location.href;
-
-        let tagId = new URLSearchParams(window.location.search).get("id") || "NO_TAG";
-
-        document.getElementById("status").textContent = "Отправляю данные...";
-
-        await fetch(WEB_APP_URL, {
-            method: "POST",
-            body: JSON.stringify({
-                lat: lat,
-                lng: lng,
-                ua: userAgent,
-                url: fullUrl,
-                tagId: tagId
-            }),
-            headers: { "Content-Type": "application/json" }
-        });
-
-        document.getElementById("status").textContent = "Отправлено! 📡";
-
-        // Карта
-        var map = L.map('map').setView([lat, lng], 16);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        L.marker([lat, lng]).addTo(map)
-            .bindPopup("Вы здесь").openPopup();
-
-    }, () => {
-        document.getElementById("status").textContent = "Ошибка: разрешите доступ к геолокации!";
-    });
+function showMap(lat,lng){
+  mapDiv.style.display='block';
+  if(!map){
+    map = L.map('map').setView([lat,lng],16);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OSM'}).addTo(map);
+    marker = L.marker([lat,lng]).addTo(map).bindPopup('Ваша позиция').openPopup();
+  } else {
+    map.setView([lat,lng],16);
+    marker.setLatLng([lat,lng]).openPopup();
+  }
 }
+
+async function getCoords(){
+  return new Promise((res,rej)=>{
+    if(!navigator.geolocation) return rej(new Error("Геолокация не поддерживается"));
+    navigator.geolocation.getCurrentPosition(p=>res(p.coords),e=>rej(e),{enableHighAccuracy:true,timeout:15000});
+  });
+}
+
+async function sendData(payload){
+  const res = await fetch(SHEETDB_URL, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({data: payload})
+  });
+  return await res.json();
+}
+
+sendBtn.addEventListener('click', async ()=>{
+  const text = msgEl.value.trim();
+  if(text.length<3){ alert('Введите минимум 3 символа'); return; }
+  sendBtn.disabled=true;
+  statusEl.textContent='Получаем координаты…';
+  try{
+    const coords = await getCoords();
+    statusEl.textContent='Отправка…';
+    const payload = {
+      timestamp: new Date().toISOString(),
+      lat: coords.latitude,
+      lng: coords.longitude,
+      message: text,
+      isAnonymous: !!anonEl.checked,
+      tagId:'',
+      ua:navigator.userAgent,
+      url:window.location.href
+    };
+    await sendData(payload);
+    statusEl.textContent='Отправлено ✅';
+    showMap(coords.latitude,coords.longitude);
+  } catch(err){
+    console.error(err);
+    statusEl.textContent='Ошибка: '+err.message;
+  } finally{
+    sendBtn.disabled=false;
+  }
+});
 </script>
 </body>
 </html>
-
