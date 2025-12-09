@@ -33,9 +33,7 @@
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
-/* ======== ВСТАВЬ СВОЙ SheetDB URL ======== */
 const SHEETDB_URL = "https://sheetdb.io/api/v1/loeua7zl5xak6";
-/* ========================================== */
 
 let map = L.map('map').setView([54.87,69.17], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
@@ -58,7 +56,7 @@ function render(arr){
   const log = document.getElementById('log');
   log.innerHTML = '';
 
-  markerLayer.clearLayers(); // очищаем старые маркеры
+  markerLayer.clearLayers();
 
   if(arr.length === 0) {
     log.innerHTML = '<div class="entry">Нет записей</div>';
@@ -66,15 +64,13 @@ function render(arr){
   }
 
   arr.reverse().forEach(item => {
-    // конвертируем координаты в числа, fallback если пустые
-    const lat = parseFloat(item.lat) || 54.87;
-    const lng = parseFloat(item.lng) || 69.17;
+    const lat = parseFloat(item.lat);
+    const lng = parseFloat(item.lng);
+    if(isNaN(lat) || isNaN(lng)) return;
 
-    // проверка сообщений
     const message = item.message || '-';
     const isAnon = item.isAnonymous === 'true';
 
-    // добавляем запись в лог
     const entry = document.createElement('div');
     entry.className = 'entry';
     entry.innerHTML = `<div><b>${new Date(item.timestamp).toLocaleString()}</b></div>
@@ -85,7 +81,6 @@ function render(arr){
                        </div>`;
     log.prepend(entry);
 
-    // создаем маркер с цветом
     const color = isAnon ? 'red' : 'blue';
     const icon = L.icon({
       iconUrl:`https://chart.googleapis.com/chart?chst=d_map_pin_letter&chld=%E2%80%A2|${color}`,
@@ -96,11 +91,10 @@ function render(arr){
       .bindPopup(`<b>${new Date(item.timestamp).toLocaleString()}</b><br>${escapeHtml(message)}<br>tag:${item.tagId||'-'}<br>${isAnon?'Аноним':'Не аноним'}`);
   });
 
-  // центрируем на последнем маркере
   const last = arr[arr.length-1];
-  const lastLat = parseFloat(last.lat) || 54.87;
-  const lastLng = parseFloat(last.lng) || 69.17;
-  map.setView([lastLat,lastLng], 15);
+  const lastLat = parseFloat(last.lat);
+  const lastLng = parseFloat(last.lng);
+  if(!isNaN(lastLat) && !isNaN(lastLng)) map.setView([lastLat,lastLng], 15);
 }
 
 function escapeHtml(s){ 
